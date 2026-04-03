@@ -1,4 +1,7 @@
 spring:
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:dev}
+
   datasource:
     url: jdbc:h2:file:./data/finance_db;DB_CLOSE_DELAY=-1;AUTO_SERVER=TRUE
     driver-class-name: org.h2.Driver
@@ -16,14 +19,18 @@ spring:
     console:
       enabled: true
       path: /h2-console
+  cache:
+    type: caffeine
+    caffeine:
+      spec: maximumSize=100,expireAfterWrite=60s
 
 app:
   jwt:
-    secret: Y2hhbmdlLXRoaXMtdG8tYS1sb25nLXNlY3VyZS1yYW5kb20tc2VjcmV0LWtleS1pbi1wcm9kdWN0aW9u
-    expiration-ms: 86400000  # 24 hours
+    secret: ${APP_JWT_SECRET:Y2hhbmdlLXRoaXMtdG8tYS1sb25nLXNlY3VyZS1yYW5kb20tc2VjcmV0LWtleS1pbi1wcm9kdWN0aW9u}
+    expiration-ms: ${APP_JWT_EXPIRATION:86400000}
 
 server:
-  port: 8080
+  port: ${PORT:8080}
 
 springdoc:
   api-docs:

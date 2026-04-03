@@ -8,12 +8,13 @@ import com.finance.dto.response.AuthResponse;
 import com.finance.dto.response.PasswordResetResponse;
 import com.finance.entity.PasswordResetToken;
 import com.finance.entity.User;
+import com.finance.enums.Role;
 import com.finance.exception.DuplicateResourceException;
-import com.finance.exception.ResourceNotFoundException;
 import com.finance.repository.PasswordResetTokenRepository;
 import com.finance.security.JwtService;
 import com.finance.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -26,6 +27,7 @@ import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class AuthService {
 
     private final UserRepository userRepository;
@@ -42,12 +44,14 @@ public class AuthService {
             throw new DuplicateResourceException("Email already exists");
         }
 
+        // Public registration always assigns VIEWER role.
+        // Role elevation requires an ADMIN to update via PUT /api/users/{id}.
         User user = User.builder()
                 .username(request.getUsername())
                 .email(request.getEmail())
                 .password(passwordEncoder.encode(request.getPassword()))
                 .fullName(request.getFullName())
-                .role(request.getRole())
+                .role(Role.VIEWER)
                 .active(true)
                 .build();
 
@@ -63,9 +67,15 @@ public class AuthService {
 
     @Transactional
     public PasswordResetResponse forgotPassword(ForgotPasswordRequest request) {
-        User user = userRepository.findByEmail(request.getEmail())
-                .orElseThrow(() -> new ResourceNotFoundException("No account found with this email"));
+        // Always return a generic message to prevent email enumeration attacks.
+        var userOpt = userRepository.findByEmail(request.getEmail());
+        if (userOpt.isEmpty()) {
+            return PasswordResetResponse.builder()
+                    .message("If an account exists with this email, a password reset link has been sent.")
+                    .build();
+        }
 
+        User user = userOpt.get();
         String token = UUID.randomUUID().toString();
         PasswordResetToken resetToken = PasswordResetToken.builder()
                 .token(token)
@@ -75,9 +85,17 @@ public class AuthService {
                 .build();
         passwordResetTokenRepository.save(resetToken);
 
+        // In production, this token would be sent via email (JavaMailSender / SendGrid).
+        // For local development, we log it to the server console to simulate email delivery.
+        log.info("========== SIMULATED EMAIL ==========");
+        log.info("To: {}", user.getEmail());
+        log.info("Subject: Password Reset Request");
+        log.info("Reset Token: {}", token);
+        log.info("This token expires at: {}", resetToken.getExpiresAt());
+        log.info("======================================");
+
         return PasswordResetResponse.builder()
-                .message("Password reset token generated. Use it to reset your password. Expires in 15 minutes.")
-                .resetToken(token)
+                .message("If an account exists with this email, a password reset link has been sent.")
                 .build();
     }
 

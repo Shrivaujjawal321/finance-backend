@@ -3,7 +3,6 @@ package com.finance;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.finance.dto.request.LoginRequest;
 import com.finance.dto.request.RegisterRequest;
-import com.finance.enums.Role;
 import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
@@ -36,7 +35,6 @@ class AuthControllerTest {
         request.setEmail("test@example.com");
         request.setPassword("password123");
         request.setFullName("Test User");
-        request.setRole(Role.VIEWER);
 
         mockMvc.perform(post("/api/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)

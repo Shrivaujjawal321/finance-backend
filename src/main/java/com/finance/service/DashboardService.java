@@ -6,6 +6,7 @@ import com.finance.entity.FinancialRecord;
 import com.finance.enums.RecordType;
 import com.finance.repository.FinancialRecordRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 
@@ -23,6 +24,7 @@ public class DashboardService {
 
     private final FinancialRecordRepository recordRepository;
 
+    @Cacheable(value = "dashboardSummary")
     public DashboardSummary getSummary() {
         BigDecimal totalIncome = recordRepository.sumByType(RecordType.INCOME);
         BigDecimal totalExpenses = recordRepository.sumByType(RecordType.EXPENSE);

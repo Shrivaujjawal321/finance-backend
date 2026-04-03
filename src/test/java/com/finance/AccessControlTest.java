@@ -3,9 +3,7 @@ package com.finance;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.finance.dto.request.FinancialRecordRequest;
 import com.finance.dto.request.LoginRequest;
-import com.finance.dto.request.RegisterRequest;
 import com.finance.enums.RecordType;
-import com.finance.enums.Role;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -37,9 +35,10 @@ class AccessControlTest {
 
     @BeforeEach
     void setUp() throws Exception {
-        adminToken = getOrCreateToken("acl_admin", "acl_admin@test.com", "pass123", Role.ADMIN);
-        viewerToken = getOrCreateToken("acl_viewer", "acl_viewer@test.com", "pass123", Role.VIEWER);
-        analystToken = getOrCreateToken("acl_analyst", "acl_analyst@test.com", "pass123", Role.ANALYST);
+        // Use seeded users from DataSeeder (admin, analyst, viewer)
+        adminToken = loginAndGetToken("admin", "admin123");
+        viewerToken = loginAndGetToken("viewer", "viewer123");
+        analystToken = loginAndGetToken("analyst", "analyst123");
     }
 
     @Test
@@ -111,6 +110,22 @@ class AccessControlTest {
                 .andExpect(status().isForbidden());
     }
 
+    @Test
+    @Order(9)
+    void publicRegistration_alwaysAssignsViewer() throws Exception {
+        // Even if someone tries to pass a role, registration should assign VIEWER
+        String json = "{\"username\":\"hacker\",\"email\":\"h@test.com\",\"password\":\"pass123\",\"fullName\":\"Hacker\",\"role\":\"ADMIN\"}";
+
+        mockMvc.perform(post("/api/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json))
+                .andExpect(status().isCreated())
+                .andExpect(result -> {
+                    String body = result.getResponse().getContentAsString();
+                    assert body.contains("\"role\":\"VIEWER\"") : "Registration must always assign VIEWER role";
+                });
+    }
+
     private FinancialRecordRequest sampleRecord() {
         FinancialRecordRequest req = new FinancialRecordRequest();
         req.setAmount(new BigDecimal("1500.00"));
@@ -121,35 +136,17 @@ class AccessControlTest {
         return req;
     }
 
-    private String getOrCreateToken(String username, String email, String password, Role role) throws Exception {
-        // Try to register; if already exists, just login
-        RegisterRequest reg = new RegisterRequest();
-        reg.setUsername(username);
-        reg.setEmail(email);
-        reg.setPassword(password);
-        reg.setFullName(username);
-        reg.setRole(role);
-
-        MvcResult regResult = mockMvc.perform(post("/api/auth/register")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(reg)))
-                .andReturn();
-
-        if (regResult.getResponse().getStatus() == 201) {
-            return objectMapper.readTree(regResult.getResponse().getContentAsString()).get("token").asText();
-        }
-
-        // Login if registration failed (already exists)
+    private String loginAndGetToken(String username, String password) throws Exception {
         LoginRequest login = new LoginRequest();
         login.setUsername(username);
         login.setPassword(password);
 
-        MvcResult loginResult = mockMvc.perform(post("/api/auth/login")
+        MvcResult result = mockMvc.perform(post("/api/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(login)))
                 .andExpect(status().isOk())
                 .andReturn();
 
-        return objectMapper.readTree(loginResult.getResponse().getContentAsString()).get("token").asText();
+        return objectMapper.readTree(result.getResponse().getContentAsString()).get("token").asText();
     }
 }

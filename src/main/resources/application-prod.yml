@@ -1,0 +1,16 @@
+# Production profile — activate with SPRING_PROFILES_ACTIVE=prod
+# Requires env vars: APP_JWT_SECRET, DATABASE_URL (or individual DB vars)
+
+spring:
+  h2:
+    console:
+      enabled: false
+  jpa:
+    hibernate:
+      ddl-auto: validate
+
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false

@@ -1,6 +1,5 @@
 package com.finance.dto.request;
 
-import com.finance.enums.Role;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
@@ -24,6 +23,4 @@ public class RegisterRequest {
     @NotBlank(message = "Full name is required")
     @Size(max = 100, message = "Full name must not exceed 100 characters")
     private String fullName;
-
-    private Role role = Role.VIEWER;
 }

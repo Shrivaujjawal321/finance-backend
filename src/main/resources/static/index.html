@@ -49,14 +49,6 @@
                     <label for="reg-password">Password</label>
                     <input type="password" id="reg-password" class="form-control" placeholder="Min 6 characters">
                 </div>
-                <div class="form-group">
-                    <label for="reg-role">Role</label>
-                    <select id="reg-role" class="form-control">
-                        <option value="VIEWER">Viewer</option>
-                        <option value="ANALYST">Analyst</option>
-                        <option value="ADMIN">Admin</option>
-                    </select>
-                </div>
                 <button class="btn btn-primary" style="width:100%; margin-top:8px;" id="btn-register">Create Account</button>
                 <p style="text-align:center; margin-top:16px; font-size:0.88rem; color:#6c757d;">
                     Already have an account? <a href="#" id="show-login" style="color:var(--primary); text-decoration:none; font-weight:600;">Sign In</a>
@@ -66,7 +58,7 @@
             <!-- Forgot Password Form -->
             <div id="forgot-form" style="display:none;">
                 <p style="text-align:center; color:var(--text-muted); margin-bottom:20px; font-size:0.9rem;">
-                    Enter your email address and we'll generate a reset token for you.
+                    Enter your email address and we'll send a reset token to your inbox.
                 </p>
                 <div class="form-group">
                     <label for="forgot-email">Email Address</label>
@@ -81,7 +73,7 @@
             <!-- Reset Password Form -->
             <div id="reset-form" style="display:none;">
                 <p style="text-align:center; color:var(--text-muted); margin-bottom:20px; font-size:0.9rem;">
-                    Enter the reset token and your new password.
+                    Enter the reset token from your email and choose a new password.
                 </p>
                 <div class="form-group">
                     <label for="reset-token">Reset Token</label>
@@ -157,13 +149,12 @@
             const username = document.getElementById('reg-username').value.trim();
             const email = document.getElementById('reg-email').value.trim();
             const password = document.getElementById('reg-password').value;
-            const role = document.getElementById('reg-role').value;
             if (!fullName || !username || !email || !password) { showToast('Please fill all fields', 'error'); return; }
 
             const btn = document.getElementById('btn-register');
             try {
                 btn.disabled = true; btn.textContent = 'Creating account...';
-                const data = await Auth.register({ fullName, username, email, password, role });
+                const data = await Auth.register({ fullName, username, email, password });
                 saveAuth(data);
                 showToast('Account created!', 'success');
                 setTimeout(() => {
@@ -182,12 +173,12 @@
 
             const btn = document.getElementById('btn-forgot');
             try {
-                btn.disabled = true; btn.textContent = 'Generating token...';
+                btn.disabled = true; btn.textContent = 'Sending...';
                 const data = await Auth.forgotPassword({ email });
                 showToast(data.message, 'success');
 
-                // Auto-fill the token in reset form and switch to it
-                document.getElementById('reset-token').value = data.resetToken;
+                // Token is delivered via email (check server console for demo).
+                // Switch to the reset form for manual token entry.
                 showForm('reset-form');
             } catch (err) {
                 showToast(err.message, 'error');
