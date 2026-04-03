@@ -19,11 +19,11 @@ spring:
 
 app:
   jwt:
-    secret: Y2hhbmdlLXRoaXMtdG8tYS1sb25nLXNlY3VyZS1yYW5kb20tc2VjcmV0LWtleS1pbi1wcm9kdWN0aW9u
-    expiration-ms: 86400000  # 24 hours
+    secret: ${APP_JWT_SECRET:Y2hhbmdlLXRoaXMtdG8tYS1sb25nLXNlY3VyZS1yYW5kb20tc2VjcmV0LWtleS1pbi1wcm9kdWN0aW9u}
+    expiration-ms: ${APP_JWT_EXPIRATION_MS:86400000}
 
 server:
-  port: 8080
+  port: ${PORT:8080}
 
 springdoc:
   api-docs:
