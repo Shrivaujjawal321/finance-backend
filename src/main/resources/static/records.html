@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Records - FinanceApp</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <div class="app-wrapper" id="app">
+        <div class="main-content">
+            <div class="page-header">
+                <h1>Financial Records</h1>
+                <p>Manage income and expense entries</p>
+            </div>
+
+            <!-- Filters -->
+            <div class="card">
+                <div class="card-body">
+                    <div class="filter-bar">
+                        <div class="form-group">
+                            <label>Type</label>
+                            <select id="filter-type" class="form-control">
+                                <option value="">All Types</option>
+                                <option value="INCOME">Income</option>
+                                <option value="EXPENSE">Expense</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Category</label>
+                            <input type="text" id="filter-category" class="form-control" placeholder="e.g. Salary">
+                        </div>
+                        <div class="form-group">
+                            <label>From Date</label>
+                            <input type="date" id="filter-start" class="form-control">
+                        </div>
+                        <div class="form-group">
+                            <label>To Date</label>
+                            <input type="date" id="filter-end" class="form-control">
+                        </div>
+                        <div class="form-group">
+                            <button class="btn btn-primary" id="btn-filter">Filter</button>
+                            <button class="btn btn-outline" id="btn-clear-filter">Clear</button>
+                        </div>
+                        <div class="form-group admin-only" style="margin-left:auto;">
+                            <button class="btn btn-success" id="btn-add-record">+ Add Record</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Records Table -->
+            <div class="card">
+                <div class="card-body">
+                    <div class="table-wrapper">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Date</th>
+                                    <th>Description</th>
+                                    <th>Category</th>
+                                    <th>Type</th>
+                                    <th style="text-align:right">Amount</th>
+                                    <th>Created By</th>
+                                    <th class="admin-only" style="text-align:center">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="records-table">
+                                <tr><td colspan="8" class="loading-state">Loading...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="pagination" id="pagination"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add/Edit Record Modal -->
+    <div class="modal-overlay" id="record-modal">
+        <div class="modal-box">
+            <div class="modal-header">
+                <span id="modal-title">Add Record</span>
+                <button class="close-btn" id="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="record-id">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Amount</label>
+                        <input type="number" id="record-amount" class="form-control" step="0.01" min="0.01" placeholder="0.00">
+                    </div>
+                    <div class="form-group">
+                        <label>Type</label>
+                        <select id="record-type" class="form-control">
+                            <option value="INCOME">Income</option>
+                            <option value="EXPENSE">Expense</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Category</label>
+                        <input type="text" id="record-category" class="form-control" placeholder="e.g. Salary, Rent, Food">
+                    </div>
+                    <div class="form-group">
+                        <label>Date</label>
+                        <input type="date" id="record-date" class="form-control">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Description</label>
+                    <input type="text" id="record-description" class="form-control" placeholder="Optional notes">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" id="modal-cancel">Cancel</button>
+                <button class="btn btn-primary" id="modal-save">Save Record</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="toast-container"></div>
+
+    <script src="/js/api.js"></script>
+    <script src="/js/common.js"></script>
+    <script>
+        let currentPage = 0;
+        const pageSize = 15;
+        const isAdmin = getUser()?.role === 'ADMIN';
+
+        document.getElementById('app').insertAdjacentHTML('afterbegin', sidebarHTML());
+
+        if (initPage('records')) {
+            loadRecords();
+            bindEvents();
+        }
+
+        function bindEvents() {
+            document.getElementById('btn-filter').addEventListener('click', () => { currentPage = 0; loadRecords(); });
+            document.getElementById('btn-clear-filter').addEventListener('click', () => {
+                document.getElementById('filter-type').value = '';
+                document.getElementById('filter-category').value = '';
+                document.getElementById('filter-start').value = '';
+                document.getElementById('filter-end').value = '';
+                currentPage = 0;
+                loadRecords();
+            });
+
+            document.getElementById('btn-add-record')?.addEventListener('click', () => openModal());
+            document.getElementById('modal-close').addEventListener('click', closeModal);
+            document.getElementById('modal-cancel').addEventListener('click', closeModal);
+            document.getElementById('modal-save').addEventListener('click', saveRecord);
+
+            // Close modal on overlay click
+            document.getElementById('record-modal').addEventListener('click', (e) => {
+                if (e.target === e.currentTarget) closeModal();
+            });
+        }
+
+        async function loadRecords() {
+            try {
+                const params = {
+                    type: document.getElementById('filter-type').value,
+                    category: document.getElementById('filter-category').value || null,
+                    startDate: document.getElementById('filter-start').value || null,
+                    endDate: document.getElementById('filter-end').value || null,
+                    page: currentPage,
+                    size: pageSize,
+                    sort: 'date,desc',
+                };
+                const data = await Records.list(params);
+                renderTable(data.content);
+                renderPagination(data);
+            } catch (err) {
+                showToast(err.message, 'error');
+            }
+        }
+
+        function renderTable(records) {
+            const tbody = document.getElementById('records-table');
+            if (!records.length) {
+                tbody.innerHTML = `<tr><td colspan="8" class="empty-state">No records found</td></tr>`;
+                return;
+            }
+            tbody.innerHTML = records.map(r => `
+                <tr>
+                    <td>#${r.id}</td>
+                    <td>${formatDate(r.date)}</td>
+                    <td>${r.description || '-'}</td>
+                    <td>${r.category}</td>
+                    <td><span class="badge badge-${r.type.toLowerCase()}">${r.type}</span></td>
+                    <td style="text-align:right" class="${r.type === 'INCOME' ? 'amount-positive' : 'amount-negative'}">
+                        ${r.type === 'INCOME' ? '+' : '-'}${formatCurrency(r.amount)}
+                    </td>
+                    <td>${r.createdBy}</td>
+                    <td class="admin-only" style="text-align:center">
+                        <button class="btn btn-outline btn-sm" onclick="editRecord(${r.id})">Edit</button>
+                        <button class="btn btn-danger btn-sm" onclick="deleteRecord(${r.id})">Delete</button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        function renderPagination(data) {
+            const div = document.getElementById('pagination');
+            if (data.totalPages <= 1) { div.innerHTML = ''; return; }
+            div.innerHTML = `
+                <button ${data.first ? 'disabled' : ''} onclick="goToPage(${currentPage - 1})">Previous</button>
+                <span class="page-info">Page ${data.number + 1} of ${data.totalPages} (${data.totalElements} records)</span>
+                <button ${data.last ? 'disabled' : ''} onclick="goToPage(${currentPage + 1})">Next</button>
+            `;
+        }
+
+        function goToPage(page) {
+            currentPage = page;
+            loadRecords();
+        }
+
+        function openModal(record = null) {
+            document.getElementById('modal-title').textContent = record ? 'Edit Record' : 'Add Record';
+            document.getElementById('record-id').value = record ? record.id : '';
+            document.getElementById('record-amount').value = record ? record.amount : '';
+            document.getElementById('record-type').value = record ? record.type : 'INCOME';
+            document.getElementById('record-category').value = record ? record.category : '';
+            document.getElementById('record-date').value = record ? record.date : new Date().toISOString().split('T')[0];
+            document.getElementById('record-description').value = record ? (record.description || '') : '';
+            document.getElementById('record-modal').classList.add('show');
+        }
+
+        function closeModal() {
+            document.getElementById('record-modal').classList.remove('show');
+        }
+
+        async function saveRecord() {
+            const id = document.getElementById('record-id').value;
+            const body = {
+                amount: parseFloat(document.getElementById('record-amount').value),
+                type: document.getElementById('record-type').value,
+                category: document.getElementById('record-category').value.trim(),
+                date: document.getElementById('record-date').value,
+                description: document.getElementById('record-description').value.trim() || null,
+            };
+
+            if (!body.amount || !body.category || !body.date) {
+                showToast('Please fill all required fields', 'error');
+                return;
+            }
+
+            try {
+                if (id) {
+                    await Records.update(id, body);
+                    showToast('Record updated', 'success');
+                } else {
+                    await Records.create(body);
+                    showToast('Record created', 'success');
+                }
+                closeModal();
+                loadRecords();
+            } catch (err) {
+                showToast(err.message, 'error');
+            }
+        }
+
+        async function editRecord(id) {
+            try {
+                const record = await Records.get(id);
+                openModal(record);
+            } catch (err) {
+                showToast(err.message, 'error');
+            }
+        }
+
+        async function deleteRecord(id) {
+            if (!confirm('Are you sure you want to delete this record?')) return;
+            try {
+                await Records.delete(id);
+                showToast('Record deleted', 'success');
+                loadRecords();
+            } catch (err) {
+                showToast(err.message, 'error');
+            }
+        }
+    </script>
+</body>
+</html>

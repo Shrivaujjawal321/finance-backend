@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - FinanceApp</title>
+    <link rel="stylesheet" href="/css/style.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+</head>
+<body>
+    <div class="app-wrapper" id="app">
+        <!-- Sidebar injected by JS -->
+        <div class="main-content">
+            <div class="page-header">
+                <h1>Dashboard</h1>
+                <p>Financial overview and analytics</p>
+            </div>
+
+            <!-- Summary Cards -->
+            <div class="summary-cards" id="summary-cards">
+                <div class="summary-card income">
+                    <div class="card-label">Total Income</div>
+                    <div class="card-value" id="total-income">--</div>
+                </div>
+                <div class="summary-card expense">
+                    <div class="card-label">Total Expenses</div>
+                    <div class="card-value" id="total-expenses">--</div>
+                </div>
+                <div class="summary-card balance">
+                    <div class="card-label">Net Balance</div>
+                    <div class="card-value" id="net-balance">--</div>
+                </div>
+                <div class="summary-card category">
+                    <div class="card-label">Categories</div>
+                    <div class="card-value" id="total-categories">--</div>
+                </div>
+            </div>
+
+            <!-- Charts Row -->
+            <div class="grid-2">
+                <div class="card">
+                    <div class="card-header">Monthly Trends</div>
+                    <div class="card-body">
+                        <div class="chart-container">
+                            <canvas id="trends-chart"></canvas>
+                        </div>
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-header">Category Breakdown</div>
+                    <div class="card-body">
+                        <div class="chart-container">
+                            <canvas id="category-chart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Recent Activity -->
+            <div class="card">
+                <div class="card-header">Recent Activity</div>
+                <div class="card-body">
+                    <div class="table-wrapper">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Description</th>
+                                    <th>Category</th>
+                                    <th>Type</th>
+                                    <th style="text-align:right">Amount</th>
+                                </tr>
+                            </thead>
+                            <tbody id="recent-table">
+                                <tr><td colspan="5" class="loading-state">Loading...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="toast-container"></div>
+
+    <script src="/js/api.js"></script>
+    <script src="/js/common.js"></script>
+    <script>
+        let trendsChart = null;
+        let categoryChart = null;
+
+        document.getElementById('app').insertAdjacentHTML('afterbegin', sidebarHTML());
+
+        if (initPage('dashboard')) {
+            loadDashboard();
+        }
+
+        async function loadDashboard() {
+            try {
+                const data = await Dashboard.summary();
+
+                // Summary cards
+                document.getElementById('total-income').textContent = formatCurrency(data.totalIncome);
+                document.getElementById('total-expenses').textContent = formatCurrency(data.totalExpenses);
+                document.getElementById('net-balance').textContent = formatCurrency(data.netBalance);
+                document.getElementById('total-categories').textContent = Object.keys(data.categoryWiseTotals).length;
+
+                // Monthly trends chart
+                renderTrendsChart(data.monthlyTrends);
+
+                // Category chart
+                renderCategoryChart(data.categoryWiseTotals);
+
+                // Recent activity table
+                renderRecentTable(data.recentActivity);
+
+            } catch (err) {
+                showToast(err.message, 'error');
+            }
+        }
+
+        function renderTrendsChart(trends) {
+            const ctx = document.getElementById('trends-chart').getContext('2d');
+            if (trendsChart) trendsChart.destroy();
+
+            const labels = trends.map(t => t.month);
+            trendsChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels,
+                    datasets: [
+                        {
+                            label: 'Income',
+                            data: trends.map(t => t.income),
+                            backgroundColor: 'rgba(46, 196, 182, 0.7)',
+                            borderRadius: 6,
+                        },
+                        {
+                            label: 'Expenses',
+                            data: trends.map(t => t.expenses),
+                            backgroundColor: 'rgba(230, 57, 70, 0.7)',
+                            borderRadius: 6,
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { position: 'bottom' } },
+                    scales: {
+                        y: { beginAtZero: true, ticks: { callback: v => formatCurrency(v) } }
+                    }
+                }
+            });
+        }
+
+        function renderCategoryChart(categories) {
+            const ctx = document.getElementById('category-chart').getContext('2d');
+            if (categoryChart) categoryChart.destroy();
+
+            const labels = Object.keys(categories);
+            const values = Object.values(categories);
+            const colors = [
+                '#4361ee', '#2ec4b6', '#e63946', '#f4a261', '#457b9d',
+                '#6c757d', '#a855f7', '#06b6d4', '#f97316', '#84cc16'
+            ];
+
+            categoryChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels,
+                    datasets: [{
+                        data: values,
+                        backgroundColor: colors.slice(0, labels.length),
+                        borderWidth: 0,
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'bottom', labels: { padding: 16 } }
+                    }
+                }
+            });
+        }
+
+        function renderRecentTable(records) {
+            const tbody = document.getElementById('recent-table');
+            if (!records.length) {
+                tbody.innerHTML = '<tr><td colspan="5" class="empty-state">No records yet</td></tr>';
+                return;
+            }
+            tbody.innerHTML = records.map(r => `
+                <tr>
+                    <td>${formatDate(r.date)}</td>
+                    <td>${r.description || '-'}</td>
+                    <td>${r.category}</td>
+                    <td><span class="badge badge-${r.type.toLowerCase()}">${r.type}</span></td>
+                    <td style="text-align:right" class="${r.type === 'INCOME' ? 'amount-positive' : 'amount-negative'}">
+                        ${r.type === 'INCOME' ? '+' : '-'}${formatCurrency(r.amount)}
+                    </td>
+                </tr>
+            `).join('');
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Users - FinanceApp</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <div class="app-wrapper" id="app">
+        <div class="main-content">
+            <div class="page-header">
+                <h1>User Management</h1>
+                <p>Manage users and their roles</p>
+            </div>
+
+            <div class="card">
+                <div class="card-body">
+                    <div class="table-wrapper">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Username</th>
+                                    <th>Full Name</th>
+                                    <th>Email</th>
+                                    <th>Role</th>
+                                    <th>Status</th>
+                                    <th>Joined</th>
+                                    <th style="text-align:center">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="users-table">
+                                <tr><td colspan="8" class="loading-state">Loading...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit User Modal -->
+    <div class="modal-overlay" id="user-modal">
+        <div class="modal-box">
+            <div class="modal-header">
+                <span>Edit User</span>
+                <button class="close-btn" id="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="user-id">
+                <div class="form-group">
+                    <label>Full Name</label>
+                    <input type="text" id="user-fullname" class="form-control">
+                </div>
+                <div class="form-group">
+                    <label>Email</label>
+                    <input type="email" id="user-email" class="form-control">
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Role</label>
+                        <select id="user-role" class="form-control">
+                            <option value="VIEWER">Viewer</option>
+                            <option value="ANALYST">Analyst</option>
+                            <option value="ADMIN">Admin</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Status</label>
+                        <select id="user-active" class="form-control">
+                            <option value="true">Active</option>
+                            <option value="false">Inactive</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" id="modal-cancel">Cancel</button>
+                <button class="btn btn-primary" id="modal-save">Save Changes</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="toast-container"></div>
+
+    <script src="/js/api.js"></script>
+    <script src="/js/common.js"></script>
+    <script>
+        document.getElementById('app').insertAdjacentHTML('afterbegin', sidebarHTML());
+
+        if (initPage('users')) {
+            // Only admin can access
+            if (getUser().role !== 'ADMIN') {
+                showToast('Access denied', 'error');
+                setTimeout(() => window.location.href = '/records.html', 1000);
+            } else {
+                loadUsers();
+                bindEvents();
+            }
+        }
+
+        function bindEvents() {
+            document.getElementById('modal-close').addEventListener('click', closeModal);
+            document.getElementById('modal-cancel').addEventListener('click', closeModal);
+            document.getElementById('modal-save').addEventListener('click', saveUser);
+            document.getElementById('user-modal').addEventListener('click', (e) => {
+                if (e.target === e.currentTarget) closeModal();
+            });
+        }
+
+        async function loadUsers() {
+            try {
+                const users = await Users.list();
+                renderTable(users);
+            } catch (err) {
+                showToast(err.message, 'error');
+            }
+        }
+
+        function renderTable(users) {
+            const tbody = document.getElementById('users-table');
+            if (!users.length) {
+                tbody.innerHTML = '<tr><td colspan="8" class="empty-state">No users found</td></tr>';
+                return;
+            }
+            tbody.innerHTML = users.map(u => `
+                <tr>
+                    <td>#${u.id}</td>
+                    <td><strong>${u.username}</strong></td>
+                    <td>${u.fullName}</td>
+                    <td>${u.email}</td>
+                    <td><span class="badge badge-${u.role.toLowerCase()}">${u.role}</span></td>
+                    <td><span class="badge badge-${u.active ? 'active' : 'inactive'}">${u.active ? 'Active' : 'Inactive'}</span></td>
+                    <td>${formatDate(u.createdAt)}</td>
+                    <td style="text-align:center">
+                        <button class="btn btn-outline btn-sm" onclick="editUser(${u.id})">Edit</button>
+                        ${u.active ? `<button class="btn btn-danger btn-sm" onclick="deactivateUser(${u.id}, '${u.username}')">Deactivate</button>` : ''}
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        async function editUser(id) {
+            try {
+                const user = await Users.get(id);
+                document.getElementById('user-id').value = user.id;
+                document.getElementById('user-fullname').value = user.fullName;
+                document.getElementById('user-email').value = user.email;
+                document.getElementById('user-role').value = user.role;
+                document.getElementById('user-active').value = String(user.active);
+                document.getElementById('user-modal').classList.add('show');
+            } catch (err) {
+                showToast(err.message, 'error');
+            }
+        }
+
+        function closeModal() {
+            document.getElementById('user-modal').classList.remove('show');
+        }
+
+        async function saveUser() {
+            const id = document.getElementById('user-id').value;
+            const body = {
+                fullName: document.getElementById('user-fullname').value.trim(),
+                email: document.getElementById('user-email').value.trim(),
+                role: document.getElementById('user-role').value,
+                active: document.getElementById('user-active').value === 'true',
+            };
+
+            if (!body.fullName || !body.email) {
+                showToast('Please fill all fields', 'error');
+                return;
+            }
+
+            try {
+                await Users.update(id, body);
+                showToast('User updated', 'success');
+                closeModal();
+                loadUsers();
+            } catch (err) {
+                showToast(err.message, 'error');
+            }
+        }
+
+        async function deactivateUser(id, username) {
+            if (!confirm(`Deactivate user "${username}"?`)) return;
+            try {
+                await Users.delete(id);
+                showToast(`User "${username}" deactivated`, 'success');
+                loadUsers();
+            } catch (err) {
+                showToast(err.message, 'error');
+            }
+        }
+    </script>
+</body>
+</html>
