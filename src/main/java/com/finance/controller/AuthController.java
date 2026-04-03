@@ -1,8 +1,11 @@
 package com.finance.controller;
 
+import com.finance.dto.request.ForgotPasswordRequest;
 import com.finance.dto.request.LoginRequest;
 import com.finance.dto.request.RegisterRequest;
+import com.finance.dto.request.ResetPasswordRequest;
 import com.finance.dto.response.AuthResponse;
+import com.finance.dto.response.PasswordResetResponse;
 import com.finance.service.AuthService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -30,5 +33,17 @@ public class AuthController {
     @Operation(summary = "Login and get JWT token")
     public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest request) {
         return ResponseEntity.ok(authService.login(request));
+    }
+
+    @PostMapping("/forgot-password")
+    @Operation(summary = "Request a password reset token")
+    public ResponseEntity<PasswordResetResponse> forgotPassword(@Valid @RequestBody ForgotPasswordRequest request) {
+        return ResponseEntity.ok(authService.forgotPassword(request));
+    }
+
+    @PostMapping("/reset-password")
+    @Operation(summary = "Reset password using token")
+    public ResponseEntity<PasswordResetResponse> resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
+        return ResponseEntity.ok(authService.resetPassword(request));
     }
 }

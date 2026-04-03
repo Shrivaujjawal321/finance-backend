@@ -75,6 +75,8 @@ async function apiCall(endpoint, options = {}) {
 const Auth = {
     login: (body) => apiCall('/auth/login', { method: 'POST', body: JSON.stringify(body) }),
     register: (body) => apiCall('/auth/register', { method: 'POST', body: JSON.stringify(body) }),
+    forgotPassword: (body) => apiCall('/auth/forgot-password', { method: 'POST', body: JSON.stringify(body) }),
+    resetPassword: (body) => apiCall('/auth/reset-password', { method: 'POST', body: JSON.stringify(body) }),
 };
 
 // Records
