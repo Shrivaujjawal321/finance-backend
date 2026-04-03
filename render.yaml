@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: finance-backend
+    runtime: docker
+    repo: https://github.com/Shrivaujjawal321/finance-backend
+    branch: main
+    plan: free
+    dockerfilePath: ./Dockerfile
+    envVars:
+      - key: PORT
+        value: 8080
