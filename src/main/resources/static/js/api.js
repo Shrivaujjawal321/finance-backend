@@ -44,12 +44,15 @@ async function apiCall(endpoint, options = {}) {
         headers: { ...headers, ...options.headers }
     });
 
-    if (response.status === 401 || response.status === 403) {
-        if (response.status === 401) {
-            clearAuth();
-            window.location.href = '/index.html';
-            throw new Error('Session expired');
-        }
+    const isAuthEndpoint = endpoint.startsWith('/auth/');
+
+    if (response.status === 401 && !isAuthEndpoint) {
+        clearAuth();
+        window.location.href = '/index.html';
+        throw new Error('Session expired');
+    }
+
+    if (response.status === 403) {
         const err = await response.json().catch(() => ({}));
         throw new Error(err.message || 'Access denied');
     }
